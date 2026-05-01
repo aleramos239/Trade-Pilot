@@ -17,6 +17,7 @@ import {
 import type {
   AccountMapping,
   AppData,
+  CopierRule,
   BrokerFillSnapshot,
   BrokerOrderSnapshot,
   BrokerPositionSnapshot,
@@ -24,12 +25,26 @@ import type {
   ExecutionAudit,
   ExecutionRecord,
   OperatorAlert,
+  PropAccount,
   SafetySettings,
   TradingWorkspace,
 } from "@/lib/trading/types";
 
 const DATA_DIR = path.join(process.cwd(), ".data");
 const DATA_FILE = path.join(DATA_DIR, "trade-copilot.json");
+const LEGACY_DEMO_ACCOUNT_IDS = new Set([
+  "leader-nq-01",
+  "apex-150k-a",
+  "topstep-150k-x",
+  "tradeify-100k",
+  "bulenox-50k",
+]);
+const LEGACY_DEMO_RULE_IDS = new Set(["rule-futures-core"]);
+const LEGACY_DEMO_CONNECTION_IDS = new Set([
+  "broker-sim-tradovate",
+  "broker-sim-rithmic",
+  "broker-sim-projectx",
+]);
 
 let writeQueue = Promise.resolve();
 
@@ -82,18 +97,39 @@ function normalizeUser(user: AppData["users"][number]) {
 }
 
 function normalizeAppData(data: Partial<AppData>): AppData {
+  const propAccountIds = new Set(
+    (data.propAccounts ?? propAccounts)
+      .filter((account) => !LEGACY_DEMO_ACCOUNT_IDS.has(account.id))
+      .map((account) => account.id),
+  );
+
   return {
     users: (data.users?.length ? data.users : [demoUser]).map(normalizeUser),
     sessions: data.sessions ?? [],
-    propAccounts: data.propAccounts ?? propAccounts,
-    copierRules: data.copierRules ?? copierRules,
-    brokerConnections: (data.brokerConnections ?? brokerConnections).map((connection) => ({
-      ...connection,
-      credentialVaultId: connection.credentialVaultId ?? null,
-      liveEnabled: connection.liveEnabled ?? false,
-      lastError: connection.lastError ?? null,
-      lastValidatedAt: connection.lastValidatedAt ?? null,
-    })),
+    propAccounts: (data.propAccounts ?? propAccounts).filter(
+      (account) => !LEGACY_DEMO_ACCOUNT_IDS.has(account.id),
+    ),
+    copierRules: (data.copierRules ?? copierRules)
+      .filter((rule) => !LEGACY_DEMO_RULE_IDS.has(rule.id))
+      .map((rule) => ({
+        ...rule,
+        leaderAccountId: propAccountIds.has(rule.leaderAccountId) ? rule.leaderAccountId : "",
+        followerAccountIds: rule.followerAccountIds.filter((accountId) =>
+          propAccountIds.has(accountId),
+        ),
+      })),
+    brokerConnections: (data.brokerConnections ?? brokerConnections)
+      .filter(
+        (connection) =>
+          connection.mode !== "simulation" && !LEGACY_DEMO_CONNECTION_IDS.has(connection.id),
+      )
+      .map((connection) => ({
+        ...connection,
+        credentialVaultId: connection.credentialVaultId ?? null,
+        liveEnabled: connection.liveEnabled ?? false,
+        lastError: connection.lastError ?? null,
+        lastValidatedAt: connection.lastValidatedAt ?? null,
+      })),
     credentialVault: data.credentialVault ?? [],
     discoveredBrokerAccounts: data.discoveredBrokerAccounts ?? [],
     accountMappings: data.accountMappings ?? [],
@@ -102,10 +138,16 @@ function normalizeAppData(data: Partial<AppData>): AppData {
     brokerFills: data.brokerFills ?? [],
     safetySettings: data.safetySettings ?? [createDefaultSafetySettings(demoUser.id)],
     idempotencyRecords: data.idempotencyRecords ?? [],
-    executionRecords: (data.executionRecords ?? []).map(normalizeExecutionRecord),
-    executionAudits: data.executionAudits ?? [],
+    executionRecords: (data.executionRecords ?? [])
+      .filter((record) => !LEGACY_DEMO_ACCOUNT_IDS.has(record.accountId))
+      .map(normalizeExecutionRecord),
+    executionAudits: (data.executionAudits ?? []).filter(
+      (audit) => !LEGACY_DEMO_ACCOUNT_IDS.has(audit.executionPlan?.leaderAccountId ?? ""),
+    ),
     alerts: data.alerts ?? [],
-    recentExecutions: data.recentExecutions ?? recentExecutions,
+    recentExecutions: (data.recentExecutions ?? recentExecutions).filter(
+      (execution) => !String(execution.id).startsWith("ex-18"),
+    ),
   };
 }
 
@@ -249,6 +291,17 @@ export async function updateAccountState(
   });
 }
 
+export async function upsertPropAccount(account: PropAccount) {
+  return updateAppData((data) => {
+    data.propAccounts = [
+      account,
+      ...data.propAccounts.filter(
+        (item) => item.ownerId !== account.ownerId || item.id !== account.id,
+      ),
+    ];
+  });
+}
+
 export async function updateCopierRuleState(
   userId: string,
   ruleId: string,
@@ -265,6 +318,15 @@ export async function updateCopierRuleState(
         enabled: updates.enabled ?? rule.enabled,
       };
     });
+  });
+}
+
+export async function upsertCopierRule(rule: CopierRule) {
+  return updateAppData((data) => {
+    data.copierRules = [
+      rule,
+      ...data.copierRules.filter((item) => item.ownerId !== rule.ownerId || item.id !== rule.id),
+    ];
   });
 }
 

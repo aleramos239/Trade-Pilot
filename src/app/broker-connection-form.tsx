@@ -9,7 +9,7 @@ const brokerPlatforms = ["Tradovate", "Rithmic", "ProjectX"] as const;
 export function BrokerConnectionForm() {
   const router = useRouter();
   const [platform, setPlatform] = useState<(typeof brokerPlatforms)[number]>("Tradovate");
-  const [mode, setMode] = useState<"simulation" | "live">("simulation");
+  const [mode] = useState<"live">("live");
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -124,7 +124,7 @@ export function BrokerConnectionForm() {
           <input
             value={name}
             onChange={(event) => setName(event.target.value)}
-            placeholder={`${platform} ${mode === "simulation" ? "simulator" : "live stub"}`}
+            placeholder={`${platform} live`}
             className="h-10 rounded-md border border-white/10 bg-[#071016] px-3 text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-cyan-300"
           />
         </label>
@@ -145,17 +145,12 @@ export function BrokerConnectionForm() {
             </select>
           </label>
 
-          <label className="grid gap-1 text-sm">
-            <span className="text-slate-400">Mode</span>
-            <select
-              value={mode}
-              onChange={(event) => setMode(event.target.value as "simulation" | "live")}
-              className="h-10 rounded-md border border-white/10 bg-[#071016] px-3 text-slate-100 outline-none transition focus:border-cyan-300"
-            >
-              <option value="simulation">Simulation</option>
-              <option value="live">Live</option>
-            </select>
-          </label>
+          <div className="grid gap-1 text-sm">
+            <span className="text-slate-400">Connection type</span>
+            <div className="flex h-10 items-center rounded-md border border-white/10 bg-[#071016] px-3 text-slate-100">
+              Live broker
+            </div>
+          </div>
         </div>
 
         {mode === "live" ? (

@@ -4,6 +4,7 @@ import {
   Activity,
   BarChart3,
   Bell,
+  Bot,
   Box,
   Cable,
   CalendarDays,
@@ -20,12 +21,16 @@ import {
   Settings,
   Shield,
   SlidersHorizontal,
+  Trash2,
   Zap,
 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { type ComponentType, type ReactNode, useState } from "react";
 import { AccountMappingPanel } from "./account-mapping-panel";
+import { AccountSetupPanel } from "./account-setup-panel";
 import { AlertsPanel } from "./alerts-panel";
+import { AutomationSetupPanel } from "./automation-setup-panel";
 import { BrokerConnectionForm } from "./broker-connection-form";
 import { BrokerReconciliationPanel } from "./broker-reconciliation-panel";
 import { LiveReadinessPanel } from "./live-readiness-panel";
@@ -44,6 +49,7 @@ type SectionId =
   | "dashboard"
   | "connections"
   | "copy"
+  | "automation"
   | "risk"
   | "reports"
   | "prop"
@@ -59,7 +65,8 @@ const money = new Intl.NumberFormat("en-US", {
 const navItems: { id: SectionId; label: string; icon: ComponentType<{ size?: number }> }[] = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "connections", label: "Connections", icon: Cable },
-  { id: "copy", label: "Copy Trade", icon: Repeat2 },
+  { id: "copy", label: "Copy Groups", icon: Repeat2 },
+  { id: "automation", label: "Trade Automation", icon: Bot },
   { id: "risk", label: "Risk Management", icon: Shield },
   { id: "reports", label: "Report | Journal", icon: BarChart3 },
   { id: "prop", label: "Prop Firm Tracker", icon: Landmark },
@@ -113,7 +120,7 @@ export function AppShell({ workspace }: { workspace: TradingWorkspace }) {
             </div>
 
             <nav className="grid gap-1 px-3">
-              {navItems.slice(0, 6).map((item) => (
+              {navItems.slice(0, 7).map((item) => (
                 <NavButton
                   key={item.id}
                   item={item}
@@ -127,7 +134,7 @@ export function AppShell({ workspace }: { workspace: TradingWorkspace }) {
             </nav>
 
             <div className="mt-auto grid gap-1 px-3 pb-6">
-              {navItems.slice(6).map((item) => (
+              {navItems.slice(7).map((item) => (
                 <NavButton
                   key={item.id}
                   item={item}
@@ -215,9 +222,10 @@ export function AppShell({ workspace }: { workspace: TradingWorkspace }) {
             {activeSection === "copy" ? (
               <CopyTradeView workspace={workspace} activeRule={activeRule} leaderAccountId={leaderAccountId} />
             ) : null}
+            {activeSection === "automation" ? <AutomationView workspace={workspace} /> : null}
             {activeSection === "risk" ? <RiskView workspace={workspace} /> : null}
             {activeSection === "reports" ? <ReportsView workspace={workspace} /> : null}
-            {activeSection === "prop" ? <PropFirmView accounts={workspace.accounts} /> : null}
+            {activeSection === "prop" ? <PropFirmView workspace={workspace} /> : null}
             {activeSection === "settings" ? <SettingsView workspace={workspace} /> : null}
             {activeSection === "support" ? <SupportView /> : null}
           </div>
@@ -291,18 +299,31 @@ function DashboardView({
                 <Cable size={15} aria-hidden="true" />
                 Connections
               </button>
-              <button type="button" onClick={() => setSection("copy")} className="btn-primary">
-                <Repeat2 size={15} aria-hidden="true" />
-                Copy trade
+              <button type="button" onClick={() => setSection("automation")} className="btn-primary">
+                <Bot size={15} aria-hidden="true" />
+                Automation
               </button>
             </>
           }
         >
-          <div className="grid gap-3">
-            {workspace.accounts.slice(0, 6).map((account) => (
-              <AccountRow key={account.id} account={account} />
-            ))}
-          </div>
+          {workspace.accounts.length ? (
+            <div className="grid gap-3">
+              {workspace.accounts.slice(0, 6).map((account) => (
+                <AccountRow key={account.id} account={account} />
+              ))}
+            </div>
+          ) : (
+            <EmptyState
+              title="No trading accounts yet"
+              detail="Connect a broker, discover accounts, then import or create leader and follower accounts."
+              action={
+                <button type="button" onClick={() => setSection("connections")} className="btn-primary">
+                  <Cable size={15} aria-hidden="true" />
+                  Start connections
+                </button>
+              }
+            />
+          )}
         </Panel>
 
         <div className="grid gap-4">
@@ -338,6 +359,7 @@ function ConnectionsView({ workspace }: { workspace: TradingWorkspace }) {
 
       <div className="grid gap-4 xl:grid-cols-2" id="broker-setup">
         <BrokerConnectionForm />
+        <AccountSetupPanel discoveredBrokerAccounts={workspace.discoveredBrokerAccounts} />
         <AccountMappingPanel
           accounts={workspace.accounts}
           brokerConnections={workspace.brokerConnections}
@@ -372,37 +394,72 @@ function CopyTradeView({
         icon={<Repeat2 size={20} aria-hidden="true" />}
         actions={activeRule ? <CopierRuleToggle ruleId={activeRule.id} enabled={activeRule.enabled} /> : null}
       >
-        {leader ? <LeaderRow account={leader} rule={activeRule} /> : null}
-        <div className="mt-4 overflow-hidden rounded-md border border-white/10">
-          <div className="grid grid-cols-[1.4fr_0.8fr_0.8fr_0.8fr_0.7fr] gap-3 border-b border-white/10 bg-white/[0.03] px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
-            <span>Account</span>
-            <span>Broker</span>
-            <span>Daily P&L</span>
-            <span>Drawdown</span>
-            <span>Action</span>
-          </div>
-          {followers.map((account) => (
-            <div
-              key={account.id}
-              className="grid grid-cols-[1.4fr_0.8fr_0.8fr_0.8fr_0.7fr] items-center gap-3 border-b border-white/10 bg-[#1d211f] px-3 py-3 text-sm last:border-b-0"
-            >
-              <AccountName account={account} />
-              <span className="text-slate-300">{account.platform}</span>
-              <span className={account.dailyPnl >= 0 ? "text-emerald-300" : "text-rose-300"}>
-                {money.format(account.dailyPnl)}
-              </span>
-              <span className="font-mono text-slate-300">{account.drawdownUsed}%</span>
-              <AccountControls
-                accountId={account.id}
-                copyEnabled={account.copyEnabled}
-                status={account.status}
-                isLeader={false}
-              />
+        {activeRule && leader ? (
+          <>
+            <LeaderRow account={leader} rule={activeRule} />
+            <div className="mt-4 overflow-hidden rounded-md border border-white/10">
+              <div className="grid grid-cols-[1.4fr_0.8fr_0.8fr_0.8fr_0.7fr] gap-3 border-b border-white/10 bg-white/[0.03] px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
+                <span>Account</span>
+                <span>Broker</span>
+                <span>Daily P&L</span>
+                <span>Drawdown</span>
+                <span>Action</span>
+              </div>
+              {followers.map((account) => (
+                <div
+                  key={account.id}
+                  className="grid grid-cols-[1.4fr_0.8fr_0.8fr_0.8fr_0.7fr] items-center gap-3 border-b border-white/10 bg-[#1d211f] px-3 py-3 text-sm last:border-b-0"
+                >
+                  <AccountName account={account} />
+                  <span className="text-slate-300">{account.platform}</span>
+                  <span className={account.dailyPnl >= 0 ? "text-emerald-300" : "text-rose-300"}>
+                    {money.format(account.dailyPnl)}
+                  </span>
+                  <span className="font-mono text-slate-300">{account.drawdownUsed}%</span>
+                  <AccountControls
+                    accountId={account.id}
+                    copyEnabled={account.copyEnabled}
+                    status={account.status}
+                    isLeader={false}
+                  />
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          </>
+        ) : (
+          <EmptyState
+            title="No copy group configured"
+            detail="Create leader and follower accounts, then build a copy automation group."
+          />
+        )}
       </Panel>
+    </div>
+  );
+}
+
+function AutomationView({ workspace }: { workspace: TradingWorkspace }) {
+  return (
+    <div className="grid gap-4">
+      <div className="grid gap-4 xl:grid-cols-[0.85fr_1.15fr]">
+        <AutomationSetupPanel accounts={workspace.accounts} />
+        <Panel eyebrow="Webhook" title="Automated execution endpoint" icon={<Bot size={20} aria-hidden="true" />}>
+          <div className="grid gap-3 text-sm text-slate-300">
+            <ReadoutRow label="POST URL" value="/api/webhooks/tradingview" />
+            <ReadoutRow label="Secret header" value="x-trade-copilot-secret" />
+            <ReadoutRow label="Idempotency header" value="x-trade-copilot-idempotency-key" />
+            <p className="rounded-md border border-amber-300/20 bg-amber-300/5 p-3 text-amber-100">
+              Signals route to live brokers only after broker connection, account mapping, broker
+              live toggle, workspace live unlock, and kill-switch checks pass.
+            </p>
+          </div>
+        </Panel>
+      </div>
+
       <SignalTester />
+
+      <Panel eyebrow="Executions" title="Latest automation results" icon={<Zap size={20} aria-hidden="true" />}>
+        <ExecutionTable records={workspace.executionRecords.slice(0, 12)} empty="No automated executions yet." />
+      </Panel>
     </div>
   );
 }
@@ -461,7 +518,8 @@ function ReportsView({ workspace }: { workspace: TradingWorkspace }) {
   );
 }
 
-function PropFirmView({ accounts }: { accounts: PropAccount[] }) {
+function PropFirmView({ workspace }: { workspace: TradingWorkspace }) {
+  const accounts = workspace.accounts;
   const active = accounts.filter((account) => account.status === "online").length;
   const totalBalance = accounts.reduce((sum, account) => sum + account.balance, 0);
   const totalPnl = accounts.reduce((sum, account) => sum + account.dailyPnl, 0);
@@ -476,12 +534,20 @@ function PropFirmView({ accounts }: { accounts: PropAccount[] }) {
         <MetricTile label="Events" value="0" detail="this month" tone="indigo" />
       </div>
       <Panel eyebrow="Prop firm tracker" title="Accounts" icon={<Landmark size={20} aria-hidden="true" />}>
-        <div className="grid gap-3">
-          {accounts.map((account) => (
-            <AccountRow key={account.id} account={account} />
-          ))}
-        </div>
+        {accounts.length ? (
+          <div className="grid gap-3">
+            {accounts.map((account) => (
+              <AccountRow key={account.id} account={account} />
+            ))}
+          </div>
+        ) : (
+          <EmptyState
+            title="No prop accounts tracked"
+            detail="Create accounts manually or import discovered broker accounts after connecting a broker."
+          />
+        )}
       </Panel>
+      <AccountSetupPanel discoveredBrokerAccounts={workspace.discoveredBrokerAccounts} />
     </div>
   );
 }
@@ -567,6 +633,26 @@ function Panel({
       </div>
       <div className="mt-4">{children}</div>
     </section>
+  );
+}
+
+function EmptyState({
+  title,
+  detail,
+  action,
+}: {
+  title: string;
+  detail: string;
+  action?: ReactNode;
+}) {
+  return (
+    <div className="grid min-h-40 place-items-center rounded-md border border-dashed border-white/15 bg-[#202420] p-6 text-center">
+      <div>
+        <p className="font-semibold text-white">{title}</p>
+        <p className="mt-2 max-w-xl text-sm leading-6 text-slate-400">{detail}</p>
+        {action ? <div className="mt-4 flex justify-center">{action}</div> : null}
+      </div>
+    </div>
   );
 }
 
@@ -662,19 +748,39 @@ function BrokerConnectionsTable({
   connections: BrokerConnection[];
   compact?: boolean;
 }) {
+  const router = useRouter();
+  const [pendingDelete, setPendingDelete] = useState("");
+
+  async function deleteConnection(connectionId: string) {
+    setPendingDelete(connectionId);
+    await fetch(`/api/broker-connections/${connectionId}`, { method: "DELETE" });
+    setPendingDelete("");
+    router.refresh();
+  }
+
+  if (!connections.length) {
+    return (
+      <EmptyState
+        title="No broker connections"
+        detail="Add Tradovate OAuth or configure a ProjectX/Rithmic bridge before any account can route live."
+      />
+    );
+  }
+
   return (
     <div className="overflow-hidden rounded-md border border-white/10">
-      <div className={`grid ${compact ? "grid-cols-[1fr_0.7fr_0.7fr]" : "grid-cols-[1fr_0.55fr_0.8fr_0.7fr_1fr]"} gap-3 border-b border-white/10 bg-white/[0.03] px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400`}>
+      <div className={`grid ${compact ? "grid-cols-[1fr_0.7fr_0.7fr]" : "grid-cols-[1fr_0.55fr_0.8fr_0.7fr_1fr_0.5fr]"} gap-3 border-b border-white/10 bg-white/[0.03] px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400`}>
         <span>Broker</span>
         <span>Mode</span>
         <span>Status</span>
         {!compact ? <span>Accounts</span> : null}
         {!compact ? <span>Last check</span> : null}
+        {!compact ? <span>Action</span> : null}
       </div>
       {connections.map((connection) => (
         <div
           key={connection.id}
-          className={`grid ${compact ? "grid-cols-[1fr_0.7fr_0.7fr]" : "grid-cols-[1fr_0.55fr_0.8fr_0.7fr_1fr]"} items-center gap-3 border-b border-white/10 bg-[#202420] px-3 py-3 text-sm last:border-b-0`}
+          className={`grid ${compact ? "grid-cols-[1fr_0.7fr_0.7fr]" : "grid-cols-[1fr_0.55fr_0.8fr_0.7fr_1fr_0.5fr]"} items-center gap-3 border-b border-white/10 bg-[#202420] px-3 py-3 text-sm last:border-b-0`}
         >
           <div>
             <p className="font-medium text-white">{connection.name}</p>
@@ -692,6 +798,18 @@ function BrokerConnectionsTable({
                 ? new Date(connection.lastValidatedAt).toLocaleString("en-US")
                 : "not validated"}
             </span>
+          ) : null}
+          {!compact ? (
+            <button
+              type="button"
+              onClick={() => deleteConnection(connection.id)}
+              disabled={pendingDelete === connection.id}
+              className="grid h-8 w-8 place-items-center rounded-md border border-white/10 text-slate-400 transition hover:border-rose-300/40 hover:text-rose-300 disabled:opacity-60"
+              aria-label={`Delete ${connection.name}`}
+              title="Delete connection"
+            >
+              <Trash2 size={14} aria-hidden="true" />
+            </button>
           ) : null}
         </div>
       ))}

@@ -128,11 +128,12 @@ export function AccountMappingPanel({
           ))
         ) : (
           <p className="rounded-md border border-white/10 bg-[#111820] p-3 text-sm text-slate-400">
-            Create a live-stub broker connection with credentials to enable account discovery.
+            Create a live broker connection with credentials or OAuth to enable account discovery.
           </p>
         )}
 
-        <div className="grid gap-3">
+        {accounts.length ? (
+          <div className="grid gap-3">
           {accounts.map((account) => {
             const candidates = accountsByPlatform[account.platform] ?? [];
             const mapping = accountMappings.find((item) => item.appAccountId === account.id);
@@ -171,7 +172,13 @@ export function AccountMappingPanel({
               </label>
             );
           })}
-        </div>
+          </div>
+        ) : (
+          <p className="rounded-md border border-white/10 bg-[#111820] p-3 text-sm text-slate-400">
+            No app accounts exist yet. Import discovered broker accounts or create accounts in the
+            account setup panel first.
+          </p>
+        )}
 
         {message ? <p className="text-sm text-emerald-300">{message}</p> : null}
         {error ? <p className="text-sm text-rose-300">{error}</p> : null}
