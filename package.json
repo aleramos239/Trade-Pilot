@@ -9,7 +9,8 @@
     "lint": "eslint",
     "db:migrate": "node scripts/migrate-postgres.mjs",
     "db:import-json": "node scripts/import-json-to-postgres.mjs",
-    "auth:hash": "node scripts/hash-password.mjs"
+    "auth:hash": "node scripts/hash-password.mjs",
+    "tradovate:oauth": "powershell -ExecutionPolicy Bypass -File scripts/configure-tradovate-oauth.ps1"
   },
   "dependencies": {
     "lucide-react": "^1.14.0",

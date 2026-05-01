@@ -183,8 +183,8 @@ export function BrokerConnectionForm() {
                     Log in with Tradovate
                   </button>
                   <p className="text-xs leading-5 text-slate-400">
-                    This redirects to Tradovate, then returns here with an encrypted broker token.
-                    Set the OAuth client id, secret, and redirect URI in env before using it.
+                    This works like Tradecopia after you register this app in Tradovate API Access.
+                    Use redirect URI http://localhost:3000/api/broker-connections/oauth/tradovate/callback.
                   </p>
                   <button
                     type="button"

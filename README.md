@@ -1,20 +1,21 @@
 # Trade Copilot
 
-A Next.js MVP for a prop-firm trade copier and automated execution control room.
+A Next.js prop-firm trade copier and automated execution control room.
 
-The app currently runs in paper-routing mode:
+The app is setup-driven: connect a broker, discover/import broker accounts, create leader/follower
+accounts, build automation groups, then route webhook executions through safety checks.
 
-- Dashboard for leader and follower prop-firm accounts
+- Dashboard for leader and follower prop-firm accounts after setup
 - Copier rule model with sizing, symbol maps, and account status
 - TradingView-style webhook endpoint at `/api/webhooks/tradingview`
 - Risk-aware execution preview for daily loss and trailing drawdown
 - Client-side signal tester for webhook payloads
 - Local persistent workspace data in `.data/trade-copilot.json`
 - Demo operator session for dashboard mutations
-- Broker adapter interface with simulated Tradovate, Rithmic, and ProjectX connections
+- Broker adapter interface for Tradovate, Rithmic, and ProjectX connections
 - Execution router that persists simulated, blocked, and rejected order records
-- Encrypted local credential vault for live-stub broker connections
-- Broker setup UI for simulation or live-stub connections
+- Encrypted local credential vault for broker connections
+- Broker setup UI for live connections
 - Tradecopia-style Tradovate OAuth login flow using `/auth/oauthtoken`
 - Advanced Tradovate direct API fallback using `/auth/accessTokenRequest`
 - Tradovate account discovery using `/account/list`
@@ -81,6 +82,18 @@ NEXT_PUBLIC_APP_URL="http://localhost:3000"
 TRADOVATE_OAUTH_CLIENT_ID="your-client-id"
 TRADOVATE_OAUTH_CLIENT_SECRET="your-client-secret"
 TRADOVATE_OAUTH_REDIRECT_URI="http://localhost:3000/api/broker-connections/oauth/tradovate/callback"
+```
+
+You can write those values into `.env.local` with:
+
+```bash
+npm.cmd run tradovate:oauth
+```
+
+Register the same redirect URI in Tradovate:
+
+```text
+http://localhost:3000/api/broker-connections/oauth/tradovate/callback
 ```
 
 The app redirects users to Tradovate login, receives the callback code, exchanges it through
