@@ -6,7 +6,11 @@ import { useState } from "react";
 
 const brokerPlatforms = ["Tradovate", "Rithmic", "ProjectX"] as const;
 
-export function BrokerConnectionForm() {
+export function BrokerConnectionForm({
+  tradovateOAuthConfigured,
+}: {
+  tradovateOAuthConfigured: boolean;
+}) {
   const router = useRouter();
   const [platform, setPlatform] = useState<(typeof brokerPlatforms)[number]>("Tradovate");
   const [mode] = useState<"live">("live");
@@ -99,6 +103,12 @@ export function BrokerConnectionForm() {
   function startTradovateOAuth() {
     setMessage("");
     setError("");
+
+    if (!tradovateOAuthConfigured) {
+      setError("Tradovate OAuth is not configured yet. Register the app in Tradovate, run npm.cmd run tradovate:oauth, then restart Trade Pilot.");
+      return;
+    }
+
     const params = new URLSearchParams({
       environment,
       ...(name.trim() ? { name: name.trim() } : {}),
@@ -174,13 +184,32 @@ export function BrokerConnectionForm() {
               </label>
               {platform === "Tradovate" ? (
                 <div className="grid gap-3 rounded-md border border-cyan-300/20 bg-cyan-300/5 p-3 sm:col-span-2">
+                  {!tradovateOAuthConfigured ? (
+                    <div className="rounded-md border border-amber-300/30 bg-amber-300/10 p-3 text-sm text-amber-100">
+                      <p className="font-semibold">Tradovate login is not ready on this machine.</p>
+                      <p className="mt-2 leading-6">
+                        Create an OAuth Registration in Tradovate with redirect URI
+                        {" "}
+                        <span className="font-mono text-amber-50">
+                          http://localhost:3000/api/broker-connections/oauth/tradovate/callback
+                        </span>
+                        , then run <span className="font-mono text-amber-50">npm.cmd run tradovate:oauth</span>
+                        {" "}and restart the app.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="rounded-md border border-emerald-300/25 bg-emerald-300/10 p-3 text-sm text-emerald-100">
+                      Tradovate OAuth is configured. The login button can open Tradovate now.
+                    </div>
+                  )}
                   <button
                     type="button"
                     onClick={startTradovateOAuth}
-                    className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-cyan-300 px-4 text-sm font-semibold text-slate-950 transition hover:bg-cyan-200"
+                    disabled={!tradovateOAuthConfigured}
+                    className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-cyan-300 px-4 text-sm font-semibold text-slate-950 transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <LogIn size={16} aria-hidden="true" />
-                    Log in with Tradovate
+                    {tradovateOAuthConfigured ? "Log in with Tradovate" : "Tradovate setup required"}
                   </button>
                   <p className="text-xs leading-5 text-slate-400">
                     This works like Tradecopia after you register this app in Tradovate API Access.

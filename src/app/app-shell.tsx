@@ -74,7 +74,13 @@ const navItems: { id: SectionId; label: string; icon: ComponentType<{ size?: num
   { id: "support", label: "Support", icon: LifeBuoy },
 ];
 
-export function AppShell({ workspace }: { workspace: TradingWorkspace }) {
+export function AppShell({
+  workspace,
+  tradovateOAuthConfigured,
+}: {
+  workspace: TradingWorkspace;
+  tradovateOAuthConfigured: boolean;
+}) {
   const [activeSection, setActiveSection] = useState<SectionId>("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const activeRule = workspace.copierRules.find((rule) => rule.enabled) ?? workspace.copierRules[0];
@@ -218,7 +224,12 @@ export function AppShell({ workspace }: { workspace: TradingWorkspace }) {
                 setSection={setActiveSection}
               />
             ) : null}
-            {activeSection === "connections" ? <ConnectionsView workspace={workspace} /> : null}
+            {activeSection === "connections" ? (
+              <ConnectionsView
+                workspace={workspace}
+                tradovateOAuthConfigured={tradovateOAuthConfigured}
+              />
+            ) : null}
             {activeSection === "copy" ? (
               <CopyTradeView workspace={workspace} activeRule={activeRule} leaderAccountId={leaderAccountId} />
             ) : null}
@@ -339,7 +350,13 @@ function DashboardView({
   );
 }
 
-function ConnectionsView({ workspace }: { workspace: TradingWorkspace }) {
+function ConnectionsView({
+  workspace,
+  tradovateOAuthConfigured,
+}: {
+  workspace: TradingWorkspace;
+  tradovateOAuthConfigured: boolean;
+}) {
   return (
     <div className="grid gap-4">
       <BestPractices />
@@ -358,7 +375,7 @@ function ConnectionsView({ workspace }: { workspace: TradingWorkspace }) {
       </Panel>
 
       <div className="grid gap-4 xl:grid-cols-2" id="broker-setup">
-        <BrokerConnectionForm />
+        <BrokerConnectionForm tradovateOAuthConfigured={tradovateOAuthConfigured} />
         <AccountSetupPanel discoveredBrokerAccounts={workspace.discoveredBrokerAccounts} />
         <AccountMappingPanel
           accounts={workspace.accounts}

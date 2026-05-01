@@ -24,5 +24,12 @@ export default async function Home() {
     );
   }
 
-  return <AppShell workspace={workspace} />;
+  return (
+    <AppShell
+      workspace={workspace}
+      tradovateOAuthConfigured={Boolean(
+        process.env.TRADOVATE_OAUTH_CLIENT_ID && process.env.TRADOVATE_OAUTH_CLIENT_SECRET,
+      )}
+    />
+  );
 }
