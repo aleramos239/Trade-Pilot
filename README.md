@@ -15,7 +15,8 @@ The app currently runs in paper-routing mode:
 - Execution router that persists simulated, blocked, and rejected order records
 - Encrypted local credential vault for live-stub broker connections
 - Broker setup UI for simulation or live-stub connections
-- Tradovate credential validation flow using `/auth/accessTokenRequest`
+- Tradecopia-style Tradovate OAuth login flow using `/auth/oauthtoken`
+- Advanced Tradovate direct API fallback using `/auth/accessTokenRequest`
 - Tradovate account discovery using `/account/list`
 - Account mapping UI from local prop accounts to discovered broker accounts
 - Safety-gated Tradovate live order adapter using contract lookup and order submission
@@ -72,9 +73,23 @@ npm.cmd run db:import-json
 
 ## Broker Bridge Contract
 
-Tradovate uses its native API. Rithmic and ProjectX are wired through a secure HTTP bridge because
-their production access depends on vendor/prop-firm infrastructure. Configure a bridge URL on the
-broker connection. The bridge should expose:
+Tradovate uses its native API. For the normal user experience, configure a Tradovate OAuth
+registration and set:
+
+```bash
+NEXT_PUBLIC_APP_URL="http://localhost:3000"
+TRADOVATE_OAUTH_CLIENT_ID="your-client-id"
+TRADOVATE_OAUTH_CLIENT_SECRET="your-client-secret"
+TRADOVATE_OAUTH_REDIRECT_URI="http://localhost:3000/api/broker-connections/oauth/tradovate/callback"
+```
+
+The app redirects users to Tradovate login, receives the callback code, exchanges it through
+`/auth/oauthtoken`, encrypts the broker token, and discovers Tradovate accounts. The older
+username/password access-token request is still available under advanced direct API credentials.
+
+Rithmic and ProjectX are wired through a secure HTTP bridge because their production access depends
+on vendor/prop-firm infrastructure. Configure a bridge URL on the broker connection. The bridge
+should expose:
 
 - `POST /validate`
 - `GET /accounts`

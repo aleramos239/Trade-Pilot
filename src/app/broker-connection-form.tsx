@@ -1,6 +1,6 @@
 "use client";
 
-import { KeyRound, PlugZap } from "lucide-react";
+import { KeyRound, LogIn, PlugZap } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -22,9 +22,28 @@ export function BrokerConnectionForm() {
   const [deviceId, setDeviceId] = useState("");
   const [environment, setEnvironment] = useState<"demo" | "live">("demo");
   const [validateNow, setValidateNow] = useState(false);
+  const [showAdvancedDirect, setShowAdvancedDirect] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [brokerConnectStatus] = useState(() =>
+    typeof window === "undefined"
+      ? ""
+      : new URLSearchParams(window.location.search).get("brokerConnect") ?? "",
+  );
+  const showManualSave = mode !== "live" || platform !== "Tradovate" || showAdvancedDirect;
+  const brokerConnectMessage =
+    brokerConnectStatus === "tradovate-oauth-connected"
+      ? "Tradovate login connected and accounts were discovered."
+      : brokerConnectStatus === "tradovate-oauth-connected-no-accounts"
+        ? "Tradovate login connected, but no accounts were discovered yet."
+        : brokerConnectStatus === "tradovate-oauth-missing-env"
+          ? "Tradovate OAuth needs TRADOVATE_OAUTH_CLIENT_ID and TRADOVATE_OAUTH_CLIENT_SECRET in env."
+          : brokerConnectStatus === "tradovate-oauth-state-error"
+            ? "Tradovate login expired or failed state validation. Start the login again."
+            : brokerConnectStatus === "tradovate-oauth-denied"
+              ? "Tradovate login was canceled or denied."
+              : "";
 
   async function saveConnection() {
     setMessage("");
@@ -77,6 +96,16 @@ export function BrokerConnectionForm() {
     }
   }
 
+  function startTradovateOAuth() {
+    setMessage("");
+    setError("");
+    const params = new URLSearchParams({
+      environment,
+      ...(name.trim() ? { name: name.trim() } : {}),
+    });
+    window.location.assign(`/api/broker-connections/oauth/tradovate/start?${params.toString()}`);
+  }
+
   return (
     <div className="rounded-lg border border-white/10 bg-[#0d151d] p-5 shadow-2xl shadow-black/20">
       <div className="flex items-center justify-between gap-4">
@@ -124,7 +153,7 @@ export function BrokerConnectionForm() {
               className="h-10 rounded-md border border-white/10 bg-[#071016] px-3 text-slate-100 outline-none transition focus:border-cyan-300"
             >
               <option value="simulation">Simulation</option>
-              <option value="live">Live stub</option>
+              <option value="live">Live</option>
             </select>
           </label>
         </div>
@@ -132,8 +161,9 @@ export function BrokerConnectionForm() {
         {mode === "live" ? (
           <div className="grid gap-3 rounded-md border border-amber-300/15 bg-amber-300/5 p-3">
             <p className="text-sm leading-6 text-amber-100">
-              Live credentials are encrypted. Tradovate uses its native API; Rithmic and ProjectX use
-              a broker bridge URL with validate, accounts, reconcile, orders, and flatten endpoints.
+              Live credentials are encrypted. Tradovate should be connected through broker login;
+              Rithmic and ProjectX use a broker bridge URL with validate, accounts, reconcile,
+              orders, and flatten endpoints.
             </p>
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="grid gap-1 text-sm">
@@ -147,6 +177,31 @@ export function BrokerConnectionForm() {
                   <option value="live">Live</option>
                 </select>
               </label>
+              {platform === "Tradovate" ? (
+                <div className="grid gap-3 rounded-md border border-cyan-300/20 bg-cyan-300/5 p-3 sm:col-span-2">
+                  <button
+                    type="button"
+                    onClick={startTradovateOAuth}
+                    className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-cyan-300 px-4 text-sm font-semibold text-slate-950 transition hover:bg-cyan-200"
+                  >
+                    <LogIn size={16} aria-hidden="true" />
+                    Log in with Tradovate
+                  </button>
+                  <p className="text-xs leading-5 text-slate-400">
+                    This redirects to Tradovate, then returns here with an encrypted broker token.
+                    Set the OAuth client id, secret, and redirect URI in env before using it.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setShowAdvancedDirect((value) => !value)}
+                    className="justify-self-start text-xs font-semibold text-cyan-200 underline underline-offset-4"
+                  >
+                    {showAdvancedDirect ? "Hide direct API credentials" : "Advanced direct API credentials"}
+                  </button>
+                </div>
+              ) : null}
+              {platform === "Tradovate" && !showAdvancedDirect ? null : (
+                <>
               <label className="grid gap-1 text-sm">
                 <span className="text-slate-400">Username</span>
                 <input
@@ -213,6 +268,8 @@ export function BrokerConnectionForm() {
                   className="h-10 rounded-md border border-white/10 bg-[#071016] px-3 text-slate-100 outline-none transition focus:border-cyan-300"
                 />
               </label>
+                </>
+              )}
               {platform !== "Tradovate" ? (
                 <label className="grid gap-1 text-sm sm:col-span-2">
                   <span className="text-slate-400">Bridge URL</span>
@@ -225,7 +282,7 @@ export function BrokerConnectionForm() {
                 </label>
               ) : null}
             </div>
-            {platform === "Tradovate" || bridgeUrl ? (
+            {(platform === "Tradovate" && showAdvancedDirect) || bridgeUrl ? (
               <label className="flex items-center gap-3 text-sm text-slate-300">
                 <input
                   type="checkbox"
@@ -237,22 +294,27 @@ export function BrokerConnectionForm() {
               </label>
             ) : (
               <p className="text-sm text-slate-400">
-                Add a bridge URL to validate {platform} credentials.
+                {platform === "Tradovate"
+                  ? "Use the Tradovate login button for the normal broker connection flow."
+                  : `Add a bridge URL to validate ${platform} credentials.`}
               </p>
             )}
           </div>
         ) : null}
 
-        <button
-          type="button"
-          onClick={saveConnection}
-          disabled={isSaving}
-          className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-cyan-300 px-4 text-sm font-semibold text-slate-950 transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <PlugZap size={16} aria-hidden="true" />
-          {isSaving ? "Saving connection" : "Save broker connection"}
-        </button>
+        {showManualSave ? (
+          <button
+            type="button"
+            onClick={saveConnection}
+            disabled={isSaving}
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-cyan-300 px-4 text-sm font-semibold text-slate-950 transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <PlugZap size={16} aria-hidden="true" />
+            {isSaving ? "Saving connection" : "Save broker connection"}
+          </button>
+        ) : null}
 
+        {brokerConnectMessage ? <p className="text-sm text-cyan-200">{brokerConnectMessage}</p> : null}
         {message ? <p className="text-sm text-emerald-300">{message}</p> : null}
         {error ? <p className="text-sm text-rose-300">{error}</p> : null}
       </div>

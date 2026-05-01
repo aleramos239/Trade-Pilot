@@ -16,6 +16,10 @@ export async function GET() {
       process.env.NODE_ENV !== "production"
         ? "configured"
         : "missing",
+    tradovateOAuth:
+      process.env.TRADOVATE_OAUTH_CLIENT_ID && process.env.TRADOVATE_OAUTH_CLIENT_SECRET
+        ? "configured"
+        : "missing",
   };
 
   try {

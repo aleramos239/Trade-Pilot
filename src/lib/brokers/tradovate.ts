@@ -8,11 +8,11 @@ import type {
   BrokerValidationResult,
 } from "./types";
 import type { BrokerCredentialInput } from "@/lib/security/credential-vault";
-
-const TRADOVATE_BASE_URL = {
-  demo: "https://demo.tradovateapi.com/v1",
-  live: "https://live.tradovateapi.com/v1",
-};
+import {
+  hasUsableTradovateOAuthToken,
+  refreshTradovateOAuthCredentials,
+  TRADOVATE_BASE_URL,
+} from "./tradovate-auth";
 
 function requireField(credentials: BrokerCredentialInput, field: keyof BrokerCredentialInput) {
   const value = credentials[field];
@@ -136,6 +136,28 @@ export class TradovateAdapter extends LiveBrokerStubAdapter {
   }
 
   private async getAccessToken(credentials: BrokerCredentialInput) {
+    if (credentials.authMethod === "oauth" || credentials.accessToken || credentials.refreshToken) {
+      if (hasUsableTradovateOAuthToken(credentials) && credentials.accessToken) {
+        return {
+          accessToken: credentials.accessToken,
+          baseUrl: TRADOVATE_BASE_URL[credentials.environment ?? "demo"],
+          accountSpec: credentials.username,
+        };
+      }
+
+      const refreshed = await refreshTradovateOAuthCredentials(credentials);
+
+      if (!refreshed.accessToken) {
+        throw new Error("Tradovate OAuth token refresh did not return an access token.");
+      }
+
+      return {
+        accessToken: refreshed.accessToken,
+        baseUrl: TRADOVATE_BASE_URL[refreshed.environment ?? credentials.environment ?? "demo"],
+        accountSpec: refreshed.username ?? credentials.username,
+      };
+    }
+
     const { environment, response, body } = await this.requestAccessToken(credentials);
 
     if (!response.ok || typeof body.accessToken !== "string") {
@@ -149,6 +171,7 @@ export class TradovateAdapter extends LiveBrokerStubAdapter {
     return {
       accessToken: body.accessToken,
       baseUrl: TRADOVATE_BASE_URL[environment],
+      accountSpec: credentials.username,
     };
   }
 
@@ -241,6 +264,27 @@ export class TradovateAdapter extends LiveBrokerStubAdapter {
     const checkedAt = new Date().toISOString();
 
     try {
+      if (credentials.authMethod === "oauth" || credentials.accessToken || credentials.refreshToken) {
+        const { accessToken, baseUrl } = await this.getAccessToken(credentials);
+        const response = await fetch(`${baseUrl}/auth/me`, {
+          headers: {
+            Accept: "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+        });
+        const body = (await response.json().catch(() => ({}))) as Record<string, unknown>;
+
+        return {
+          ok: response.ok,
+          status: response.ok ? "connected" : "error",
+          message: response.ok
+            ? "Tradovate OAuth session validated. Live order placement is safety-gated."
+            : `Tradovate OAuth validation failed with HTTP ${response.status}.`,
+          checkedAt,
+          raw: body,
+        };
+      }
+
       const { response, body } = await this.requestAccessToken(credentials);
 
       if (!response.ok || !body.accessToken) {
@@ -300,10 +344,10 @@ export class TradovateAdapter extends LiveBrokerStubAdapter {
         return this.rejectedResult(`${order.orderType} orders require a price.`);
       }
 
-      const { accessToken, baseUrl } = await this.getAccessToken(order.credentials);
+      const { accessToken, baseUrl, accountSpec } = await this.getAccessToken(order.credentials);
       const contract = await this.resolveContract(baseUrl, accessToken, order.symbol);
       const orderBody: Record<string, unknown> = {
-        accountSpec: order.credentials.username ?? order.accountName,
+        accountSpec: accountSpec ?? order.accountName,
         accountId,
         action: order.side === "buy" ? "Buy" : "Sell",
         symbol: contract.name,
@@ -580,26 +624,13 @@ export class TradovateAdapter extends LiveBrokerStubAdapter {
     const checkedAt = new Date().toISOString();
 
     try {
-      const { environment, response, body } = await this.requestAccessToken(credentials);
+      const { accessToken, baseUrl } = await this.getAccessToken(credentials);
 
-      if (!response.ok || !body.accessToken) {
-        return {
-          ok: false,
-          status: "error",
-          message:
-            typeof body.errorText === "string"
-              ? body.errorText
-              : `Tradovate token request failed with HTTP ${response.status}.`,
-          checkedAt,
-          accounts: [],
-        };
-      }
-
-      const accountResponse = await fetch(`${TRADOVATE_BASE_URL[environment]}/account/list`, {
+      const accountResponse = await fetch(`${baseUrl}/account/list`, {
         method: "GET",
         headers: {
           Accept: "application/json",
-          Authorization: `Bearer ${body.accessToken}`,
+          Authorization: `Bearer ${accessToken}`,
         },
       });
       const accounts = (await accountResponse.json().catch(() => [])) as Record<string, unknown>[];

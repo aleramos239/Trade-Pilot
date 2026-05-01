@@ -92,6 +92,10 @@ export async function POST(request: NextRequest) {
           platform,
           label: connectionName,
           credentials: {
+            authMethod:
+              platform === "Tradovate"
+                ? "direct"
+                : "bridge",
             username: payload.username,
             password: payload.password,
             apiKey: payload.apiKey,
@@ -127,6 +131,7 @@ export async function POST(request: NextRequest) {
     mode === "live" && payload.validateNow
       ? await createBrokerAdapter(baseConnection).validateCredentials?.({
           username: payload.username,
+          authMethod: platform === "Tradovate" ? "direct" : "bridge",
           password: payload.password,
           apiKey: payload.apiKey,
           apiSecret: payload.apiSecret,

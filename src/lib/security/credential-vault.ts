@@ -12,11 +12,18 @@ const LOCAL_KEY_FILE = path.join(DATA_DIR, "vault.key");
 const ALGORITHM = "aes-256-gcm";
 
 export type BrokerCredentialInput = {
+  authMethod?: "direct" | "oauth" | "bridge";
   username?: string;
   password?: string;
   apiKey?: string;
   apiSecret?: string;
   bridgeUrl?: string;
+  accessToken?: string;
+  refreshToken?: string;
+  tokenExpiresAt?: string;
+  refreshTokenExpiresAt?: string;
+  clientId?: string;
+  clientSecret?: string;
   appId?: string;
   appVersion?: string;
   cid?: string;
